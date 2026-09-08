@@ -43,19 +43,26 @@ Write `adapters/<name>_adapter.py` implementing the two-method interface in
 `registry.py`'s `_REGISTRY`, done. `harness.py` never needs to know a new
 provider exists.
 
-**Known limitation, checked and corrected after the initial push - both
-adapters are in the same position, not a tiered one.** Neither Claude nor
-OpenAI hands this harness genuinely raw reasoning by default. For Claude
-4+ models, the `thinking` block is a summary from a separate summarizer
-model unless you have a specific enterprise arrangement with Anthropic for
-full access ("the thinking model does not see the summarized output," per
-Anthropic's own docs). OpenAI's reasoning models never expose raw tokens at
-all, only a summary. Both summaries have already been through one
-compression/reframing pass before the comparator ever sees them - a clean
-drift score from either adapter is real signal, but it's checking a summary
-against a response, not unfiltered thought against a response. See the
-docstrings in `adapters/claude_adapter.py` and `adapters/openai_adapter.py`
-for the specifics per provider.
+**Known limitation, checked and corrected after the initial push - not
+every adapter is in the same position.** Neither Claude nor OpenAI hands
+this harness genuinely raw reasoning by default. For Claude 4+ models, the
+`thinking` block is a summary from a separate summarizer model unless you
+have a specific enterprise arrangement with Anthropic for full access ("the
+thinking model does not see the summarized output," per Anthropic's own
+docs). OpenAI's reasoning models never expose raw tokens at all, only a
+summary. Both summaries have already been through one compression/reframing
+pass before the comparator ever sees them.
+
+**Hermes is genuinely different here, checked not assumed:** Hermes 4 and
+DeepHermes emit `<think>...</think>` reasoning directly inline in the raw
+completion text - there's no separate summarizer model in the loop at all.
+A drift check against Hermes's reasoning is checking the model's own
+reasoning stream, not a second model's account of it. If you're running
+this harness against a self-hosted or Nous-hosted Hermes model, that's the
+strongest foundation of the three adapters shipped here for what this
+harness is actually trying to measure. See the docstrings in
+`adapters/claude_adapter.py`, `adapters/openai_adapter.py`, and
+`adapters/hermes_adapter.py` for the specifics per provider.
 
 ## Verifying the harness itself isn't bypassed
 

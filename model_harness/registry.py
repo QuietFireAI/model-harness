@@ -20,6 +20,7 @@ from typing import Type
 _REGISTRY = {
     "claude": ("model_harness.adapters.claude_adapter", "ClaudeAdapter"),
     "openai": ("model_harness.adapters.openai_adapter", "OpenAIAdapter"),
+    "hermes": ("model_harness.adapters.hermes_adapter", "HermesAdapter"),
     # Add new providers here: "name": ("module.path", "ClassName")
 }
 
