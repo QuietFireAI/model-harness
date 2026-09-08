@@ -1,0 +1,23 @@
+[project]
+name = "model-harness"
+version = "0.1.0"
+description = "Unconditional harness for open-mind and pre-response-selfcheck - provider-agnostic, you bring the adapter"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+claude = ["anthropic"]
+openai = ["openai"]
+
+[project.urls]
+Homepage = "https://dispatcheragents.com"
+Repository = "https://github.com/QuietFireAI/model-harness"
+
+[tool.hatch.build.targets.wheel]
+packages = ["model_harness"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
