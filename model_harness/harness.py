@@ -31,11 +31,11 @@ class CheckResult:
 
 
 def _run_comparator(thinking: str, text: str) -> dict:
-    """Runs the REAL open-mind Comparator - not reimplemented here. Vendored
-    under _vendor/ for now since open-mind isn't on PyPI yet; replace with a
-    real `pip install open-mind` dependency once it is, rather than keep
-    maintaining a second copy by hand."""
-    from model_harness._vendor.open_mind.comparator import Comparator
+    """Runs the REAL open-mind Comparator - a real dependency (see
+    pyproject.toml), not a hand-maintained copy. If this import fails,
+    open-mind isn't installed: `pip install model-harness` alone pulls it
+    in automatically as a required dependency."""
+    from open_mind.comparator import Comparator
     result = Comparator.compare(thinking=thinking, response=text)
     return {"drift_score": result.drift_score, "signals": result.signals,
            "summary": result.summary}

@@ -8,25 +8,66 @@ project's own founding session already documented: an agent asked to
 self-govern a rule will rationalize around it. This repo is the fix - a
 chokepoint every model call goes through, where the check isn't optional.
 
-## Provider-agnostic by design
+## Install
 
-Same principle open-mind and pre-response-selfcheck already use: "you bring
-the model." This repo doesn't hardcode Claude, OpenAI, or anyone else - it
-defines an adapter interface, ships adapters for Claude and OpenAI, and lets
-you pick a provider by name (a config value) rather than by which script
-happens to be installed.
+```bash
+pip install "model-harness[hermes] @ git+https://github.com/QuietFireAI/model-harness.git"
+```
+
+`open-mind` installs automatically as a required dependency - the harness
+is meaningless without it, so it isn't optional. Pick the extra(s) for
+whichever provider(s) you're actually using:
+
+| Extra | Pulls in | Use with |
+|---|---|---|
+| `[hermes]` | `openai` (Hermes speaks the OpenAI-compatible protocol) | **Recommended - see below** |
+| `[claude]` | `anthropic` | Claude Sonnet/Opus 4+ |
+| `[openai]` | `openai` | GPT/o-series |
+| `[gemini]` | `google-genai` | Gemini 3.x |
+| `[readershift]` | `pre-response-selfcheck` (adds the ReaderShift cold-read check alongside drift scoring) | any provider, optional |
+| `[full]` | everything above | if you're not sure yet |
+
+`pre-response-selfcheck` is **not** a required dependency - the harness as
+shipped only wires up `open-mind`'s drift scoring. Add `[readershift]` if
+you want the cold-reader check running too; nothing in `harness.py` assumes
+it's there otherwise.
+
+## Which provider should this actually point at
+
+Checked directly this session, not assumed - the honest ranking, by how raw
+the reasoning access actually is:
+
+1. **Hermes (recommended).** `<think>...</think>` tags are emitted inline
+   by the model itself. No separate summarizer model sits between the
+   reasoning and what this harness sees. This is the only one of the four
+   adapters where a clean drift score is checking against the model's own
+   unmediated reasoning stream.
+2. **Gemini.** Genuinely readable via `part.thought`, better than nothing -
+   but Google's own docs label this a "Thought summary" in their example
+   code. Whether it's a same-model condensation or passes through a second
+   model isn't publicly confirmed either way. Real access, unresolved
+   provenance.
+3. **Claude (default) / OpenAI.** Both go through a separate summarizer
+   model by default - Claude explicitly states "the thinking model does
+   not see the summarized output." OpenAI never exposes raw tokens under
+   any normal path. A passing drift score from either of these is checking
+   a compressed, reframed account of the reasoning against the response,
+   not the reasoning itself.
+
+None of this is disqualifying - even a summary that flatly contradicts the
+final answer is worth catching. But if you're choosing a provider *for
+this harness specifically*, Hermes is the one giving the harness what it's
+actually trying to measure.
 
 ```python
 from model_harness.registry import get_adapter_class
 from model_harness.harness import get_checked_response
 
-AdapterClass = get_adapter_class("claude")   # or "openai", or set MODEL_HARNESS_PROVIDER
-adapter = AdapterClass(my_anthropic_client)
+AdapterClass = get_adapter_class("hermes")   # or set MODEL_HARNESS_PROVIDER=hermes
+adapter = AdapterClass(my_openai_compatible_client, model="Hermes-4-70B")
 
 response = get_checked_response(
     adapter,
-    model="claude-sonnet-5",
-    thinking={"type": "enabled", "budget_tokens": 4000},
     messages=[{"role": "user", "content": "..."}],
 )
 ```
@@ -41,34 +82,21 @@ the three real options this was designed around.
 Write `adapters/<name>_adapter.py` implementing the two-method interface in
 `adapters/base.py` (`call()`, `extract_blocks()`), add one line to
 `registry.py`'s `_REGISTRY`, done. `harness.py` never needs to know a new
-provider exists.
-
-**Known limitation, checked and corrected after the initial push - not
-every adapter is in the same position.** Neither Claude nor OpenAI hands
-this harness genuinely raw reasoning by default. For Claude 4+ models, the
-`thinking` block is a summary from a separate summarizer model unless you
-have a specific enterprise arrangement with Anthropic for full access ("the
-thinking model does not see the summarized output," per Anthropic's own
-docs). OpenAI's reasoning models never expose raw tokens at all, only a
-summary. Both summaries have already been through one compression/reframing
-pass before the comparator ever sees them.
-
-**Hermes is genuinely different here, checked not assumed:** Hermes 4 and
-DeepHermes emit `<think>...</think>` reasoning directly inline in the raw
-completion text - there's no separate summarizer model in the loop at all.
-A drift check against Hermes's reasoning is checking the model's own
-reasoning stream, not a second model's account of it. If you're running
-this harness against a self-hosted or Nous-hosted Hermes model, that's the
-strongest foundation of the three adapters shipped here for what this
-harness is actually trying to measure. See the docstrings in
-`adapters/claude_adapter.py`, `adapters/openai_adapter.py`, and
-`adapters/hermes_adapter.py` for the specifics per provider.
+provider exists. See the provider ranking above before assuming a new
+provider's "thinking" feature gives you what this harness actually needs -
+check what's genuinely exposed, the same way each adapter here was checked
+before being shipped, not assumed from the marketing.
 
 ## Verifying the harness itself isn't bypassed
 
 ```python
 from model_harness.harness import verify_no_bypass
-offenders = verify_no_bypass(".", [r'\.messages\.create\(', r'\.responses\.create\('])
+offenders = verify_no_bypass(".", [
+    r'\.messages\.create\(',      # Claude
+    r'\.responses\.create\(',     # OpenAI
+    r'\.completions\.create\(',   # Hermes (OpenAI-compatible)
+    r'\.generate_content\(',       # Gemini
+])
 ```
 
 Run this against your own codebase periodically - a new call site that
@@ -78,13 +106,14 @@ actually using; this function doesn't hardcode any provider's call shape.
 
 ## Status
 
-Built and tested this session against the real `open-mind` Comparator
-(vendored under `_vendor/` until it's on PyPI - swap for a real dependency
-once it is, rather than maintain a second copy by hand). Harness logic and
-registry are tested end-to-end against fake adapters. `ClaudeAdapter` and
-`OpenAIAdapter` are real implementations, not yet tested against a live API
-call in this session - no key was available. Test that before trusting this
-in production, the same standard every other claim in this project gets
-held to.
+`open-mind` is a real, required dependency (installed automatically, not
+vendored - see Install above). Harness logic and registry are tested
+end-to-end against fake adapters. All four adapters have real, tested
+parsing logic (verified against realistic fake response objects for each
+provider's actual shape) and real, tested pipeline integration through the
+Comparator. None has been tested against a live API call in this
+session - no provider API keys were available, only a GitHub token. Test
+that before trusting this in production, the same standard every other
+claim in this project gets held to.
 
 Part of the DispatcherAgents stack by QuietFireAI.

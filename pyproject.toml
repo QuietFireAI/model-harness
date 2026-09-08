@@ -1,15 +1,21 @@
 [project]
 name = "model-harness"
-version = "0.1.0"
+version = "0.2.0"
 description = "Unconditional harness for open-mind and pre-response-selfcheck - provider-agnostic, you bring the adapter"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-dependencies = []
+dependencies = [
+    "open-mind @ git+https://github.com/QuietFireAI/open-mind.git",
+]
 
 [project.optional-dependencies]
 claude = ["anthropic"]
 openai = ["openai"]
+gemini = ["google-genai"]
+hermes = ["openai"]  # Hermes adapter uses the OpenAI-compatible client shape
+readershift = ["pre-response-selfcheck @ git+https://github.com/QuietFireAI/pre-response-selfcheck.git"]
+full = ["model-harness[claude,openai,gemini,hermes,readershift]"]
 
 [project.urls]
 Homepage = "https://dispatcheragents.com"
@@ -17,6 +23,9 @@ Repository = "https://github.com/QuietFireAI/model-harness"
 
 [tool.hatch.build.targets.wheel]
 packages = ["model_harness"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling"]

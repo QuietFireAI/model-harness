@@ -21,6 +21,7 @@ _REGISTRY = {
     "claude": ("model_harness.adapters.claude_adapter", "ClaudeAdapter"),
     "openai": ("model_harness.adapters.openai_adapter", "OpenAIAdapter"),
     "hermes": ("model_harness.adapters.hermes_adapter", "HermesAdapter"),
+    "gemini": ("model_harness.adapters.gemini_adapter", "GeminiAdapter"),
     # Add new providers here: "name": ("module.path", "ClassName")
 }
 
